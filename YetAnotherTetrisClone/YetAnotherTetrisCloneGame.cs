@@ -20,10 +20,14 @@ namespace YetAnotherTetrisClone
 
 		private Random Rng = new();
 		private GameState GameState = GameState.StartScreen;
-		private TimeSpan StepTime;
 		private bool[,] Playfield = new bool[10, 24]; // visually capped to 20 height
 		private bool[,] FallingPiece = Tetrominos.O;
 		private Vector2 FallingPiecePosition = new(0, 0);
+
+		private TimeSpan FallStepTime;
+		private TimeSpan LeftKeyFired;
+		private TimeSpan RightKeyFired;
+		private TimeSpan DownKeyFired;
 
 		public YetAnotherTetrisCloneGame()
 		{
@@ -53,13 +57,14 @@ namespace YetAnotherTetrisClone
 		{
 			var mouseState = Mouse.GetState();
 			var keyboardState = Keyboard.GetState();
+			var totalGameTime = gameTime.TotalGameTime;
 
 			switch (GameState)
 			{
 				case GameState.StartScreen:
 					if (keyboardState.IsKeyDown(Keys.Enter))
 					{
-						StepTime = gameTime.TotalGameTime;
+						FallStepTime = gameTime.TotalGameTime;
 						GameState = GameState.Playing;
 						NextPiece();
 					}
@@ -67,19 +72,41 @@ namespace YetAnotherTetrisClone
 					break;
 
 				case GameState.Playing:
-					if ((gameTime.TotalGameTime - StepTime).TotalMilliseconds >= 500)
+					// left
+					if (keyboardState.IsKeyDown(Keys.Left) // key
+						&& (totalGameTime - LeftKeyFired).TotalMilliseconds >= 100 // delay
+						&& !TestMoveCollideFallingPiece(-1, 0)) // colision
 					{
-						if (keyboardState.IsKeyDown(Keys.Space))
-						{
+						FallingPiecePosition.X--;
+						LeftKeyFired = totalGameTime;
+					}
 
-						}
+					// right
+					if (keyboardState.IsKeyDown(Keys.Right) // key
+						&& (totalGameTime - RightKeyFired).TotalMilliseconds >= 100 // delay
+						&& !TestMoveCollideFallingPiece(1, 0)) // colision
+					{
+						FallingPiecePosition.X++;
+						RightKeyFired = totalGameTime;
+					}
 
+					if (keyboardState.IsKeyDown(Keys.Down) // key
+						&& (totalGameTime - DownKeyFired).TotalMilliseconds >= 50 // delay
+						&& !TestMoveCollideFallingPiece(0, -1)) // colision
+					{
+						FallingPiecePosition.Y--;
+						DownKeyFired = totalGameTime;
+						FallStepTime = gameTime.TotalGameTime; // supress auto-falling
+					}
+
+					if ((totalGameTime - FallStepTime).TotalMilliseconds >= 500)
+					{
 						if (TestMoveCollideFallingPiece(0, -1))
 							NextPiece();
 						else
 							FallingPiecePosition.Y--;
 
-						StepTime = gameTime.TotalGameTime;
+						FallStepTime = gameTime.TotalGameTime;
 					}
 
 					break;
