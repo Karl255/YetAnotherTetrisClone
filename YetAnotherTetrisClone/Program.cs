@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace NBodySim
+namespace YetAnotherTetrisClone
 {
 	public static class Program
 	{
