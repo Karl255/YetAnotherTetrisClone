@@ -20,6 +20,7 @@ namespace YetAnotherTetrisClone
 
 		private Random Rng = new();
 		private GameState GameState = GameState.StartScreen;
+		private TimeSpan StepTime;
 		private bool[,] Playfield = new bool[10, 24]; // visually capped to 20 height
 		private bool[,] FallingPiece = Tetrominos.O;
 		private Vector2 FallingPiecePosition = new(0, 0);
@@ -58,6 +59,7 @@ namespace YetAnotherTetrisClone
 				case GameState.StartScreen:
 					if (keyboardState.IsKeyDown(Keys.Enter))
 					{
+						StepTime = gameTime.TotalGameTime;
 						GameState = GameState.Playing;
 						NextPiece();
 					}
@@ -65,8 +67,20 @@ namespace YetAnotherTetrisClone
 					break;
 
 				case GameState.Playing:
-					if (PreviousKeyboardState.IsKeyUp(Keys.Enter) && keyboardState.IsKeyDown(Keys.Enter))
-						NextPiece();
+					if ((gameTime.TotalGameTime - StepTime).TotalMilliseconds >= 500)
+					{
+						if (keyboardState.IsKeyDown(Keys.Space))
+						{
+
+						}
+
+						if (TestMoveCollideFallingPiece(0, -1))
+							NextPiece();
+						else
+							FallingPiecePosition.Y--;
+
+						StepTime = gameTime.TotalGameTime;
+					}
 
 					break;
 
@@ -109,10 +123,12 @@ namespace YetAnotherTetrisClone
 								Block,
 								new Vector2(
 									(FallingPiecePosition.X + x) * BlockSize,
-									(20 - FallingPiecePosition.Y + y) * BlockSize),
+									(19 - FallingPiecePosition.Y + y) * BlockSize),
 								Color.Blue);
 						}
 			}
+
+			//SpriteBatch.DrawString(GameFont, $"({FallingPiecePosition.X:0}, {FallingPiecePosition.Y:0})", new(), Color.White);
 
 			SpriteBatch.End();
 
@@ -127,7 +143,35 @@ namespace YetAnotherTetrisClone
 			int width = FallingPiece.GetLength(1);
 
 			FallingPiecePosition.X = 10 / 2 - width / 2; // centering
-			FallingPiecePosition.Y = width < 4 ? 20 : 21; // for the I piece so it touches the ceiling
+			FallingPiecePosition.Y = width < 4 ? 19 : 20; // for the I piece so it touches the ceiling
+		}
+
+		private bool TestMoveCollideFallingPiece(int dx, int dy)
+		{
+			(int x, int y) position = (
+				(int)(FallingPiecePosition.X + dx),
+				(int)(FallingPiecePosition.Y + dy)
+			);
+
+			int fallingWidth = FallingPiece.GetLength(1);
+			int fallingHeight = FallingPiece.GetLength(0);
+
+			// collide with blocks in the playing field
+			for (int y = 0; y < fallingHeight; y++)
+				for (int x = 0; x < fallingWidth; x++)
+					if (FallingPiece[x, y])
+					{
+						// collide block of piece with boundaries
+						if (position.x + x < 0 || position.x + x >= 10 ||
+							position.y - y < 0 || position.y - y >= 24)
+							return true;
+
+						// collide block of piece with playfield
+						if (Playfield[position.x + x, position.y + y])
+							return true;
+					}
+
+			return false;
 		}
 	}
 }
