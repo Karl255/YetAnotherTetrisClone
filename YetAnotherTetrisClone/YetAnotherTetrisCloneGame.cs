@@ -19,8 +19,9 @@ namespace YetAnotherTetrisClone
 
 		private Random Rng { get; init; } = new();
 		private GameState GameState = GameState.StartScreen;
-		private bool[,] Playfield;
+		private (bool occupied, Color color)[,] Playfield;
 		private bool[,] FallingPiece = Tetrominos.O;
+		private Color FallingPieceColor;
 		private (int X, int Y) FallingPiecePosition = new(0, 0);
 
 		private TimeSpan FallStepTime;
@@ -132,6 +133,7 @@ namespace YetAnotherTetrisClone
 		{
 			GraphicsDevice.Clear(Color.Black);
 
+			// TODO: switch to overlay color blending for block coloring
 			SpriteBatch.Begin();
 
 			if (GameState == GameState.StartScreen)
@@ -143,14 +145,14 @@ namespace YetAnotherTetrisClone
 			{
 				for (int y = 0; y < 20; y++)
 					for (int x = 0; x < 10; x++)
-						if (Playfield[x, y])
+						if (Playfield[x, y].occupied)
 						{
 							SpriteBatch.Draw(
 								Block,
 								new Vector2(
 									x * BlockSize,
 									(19 - y) * BlockSize),
-								Color.Red);
+								Playfield[x, y].color);
 						}
 
 				int fallingWidth = FallingPiece.GetLength(1);
@@ -165,7 +167,7 @@ namespace YetAnotherTetrisClone
 								new Vector2(
 									(FallingPiecePosition.X + x) * BlockSize,
 									(19 - FallingPiecePosition.Y + y) * BlockSize),
-								Color.Blue);
+								FallingPieceColor);
 						}
 			}
 
@@ -180,12 +182,12 @@ namespace YetAnotherTetrisClone
 
 		private void NewGame()
 		{
-			Playfield = new bool[10, 24]; // visually capped to 20 height
+			Playfield = new (bool, Color)[10, 24]; // visually capped to 20 height
 		}
 
 		private void NextPiece()
 		{
-			FallingPiece = Tetrominos.All[Rng.Next(Tetrominos.All.Length)];
+			(FallingPiece, FallingPieceColor) = Tetrominos.All[Rng.Next(Tetrominos.All.Length)];
 			int width = FallingPiece.GetLength(1);
 
 			FallingPiecePosition.X = 10 / 2 - width / 2; // centering
@@ -201,7 +203,7 @@ namespace YetAnotherTetrisClone
 				for (int x = 0; x < fallingWidth; x++)
 					if (FallingPiece[x, y])
 					{
-						Playfield[FallingPiecePosition.X + x, FallingPiecePosition.Y - y] = true;
+						Playfield[FallingPiecePosition.X + x, FallingPiecePosition.Y - y] = (true, FallingPieceColor);
 					}
 
 
@@ -229,7 +231,7 @@ namespace YetAnotherTetrisClone
 							return true;
 
 						// collide block of piece with playfield
-						if (Playfield[position.x + x, position.y - y])
+						if (Playfield[position.x + x, position.y - y].occupied)
 							return true;
 					}
 
