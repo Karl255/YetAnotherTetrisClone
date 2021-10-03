@@ -72,10 +72,19 @@ namespace YetAnotherTetrisClone
 					break;
 
 				case GameState.Playing:
+					// rotate left
+					if (PreviousKeyboardState.IsKeyUp(Keys.Z) && keyboardState.IsKeyDown(Keys.Z)
+						|| PreviousKeyboardState.IsKeyUp(Keys.Y) && keyboardState.IsKeyDown(Keys.Y))
+						RotateLeft();
+
+					// rotate right
+					if (PreviousKeyboardState.IsKeyUp(Keys.X) && keyboardState.IsKeyDown(Keys.X))
+						RotateRight();
+
 					// left
 					if (keyboardState.IsKeyDown(Keys.Left) // key
 						&& (totalGameTime - LeftKeyFired).TotalMilliseconds >= 100 // delay
-						&& !TestMoveCollideFallingPiece(-1, 0)) // colision
+						&& !TestMoveCollidePiece(-1, 0)) // colision
 					{
 						FallingPiecePosition.X--;
 						LeftKeyFired = totalGameTime;
@@ -84,16 +93,17 @@ namespace YetAnotherTetrisClone
 					// right
 					if (keyboardState.IsKeyDown(Keys.Right) // key
 						&& (totalGameTime - RightKeyFired).TotalMilliseconds >= 100 // delay
-						&& !TestMoveCollideFallingPiece(1, 0)) // colision
+						&& !TestMoveCollidePiece(1, 0)) // colision
 					{
 						FallingPiecePosition.X++;
 						RightKeyFired = totalGameTime;
 					}
 
+					// slow drop
 					if (keyboardState.IsKeyDown(Keys.Down) // key
 						&& (totalGameTime - DownKeyFired).TotalMilliseconds >= 50) // delay
 					{
-						if (TestMoveCollideFallingPiece(0, -1)) // colision
+						if (TestMoveCollidePiece(0, -1)) // colision
 							PlaceAndNextPiece();
 						else
 						{
@@ -103,9 +113,10 @@ namespace YetAnotherTetrisClone
 						}
 					}
 
+					// auto fall
 					if ((totalGameTime - FallStepTime).TotalMilliseconds >= 500)
 					{
-						if (TestMoveCollideFallingPiece(0, -1))
+						if (TestMoveCollidePiece(0, -1))
 							PlaceAndNextPiece();
 						else
 							FallingPiecePosition.Y--;
@@ -171,8 +182,6 @@ namespace YetAnotherTetrisClone
 						}
 			}
 
-			//SpriteBatch.DrawString(GameFont, $"({FallingPiecePosition.X:0}, {FallingPiecePosition.Y:0})", new(), Color.White);
-
 			SpriteBatch.End();
 
 			base.Draw(gameTime);
@@ -183,6 +192,42 @@ namespace YetAnotherTetrisClone
 		private void NewGame()
 		{
 			Playfield = new (bool, Color)[10, 24]; // visually capped to 20 height
+		}
+
+		private void RotateLeft()
+		{
+			int size = FallingPiece.GetLength(0);
+
+			bool[,] rotatedPiece = new bool[size, size];
+
+			for (int y = 0; y < size; y++)
+			{
+				for (int x = 0; x < size; x++)
+				{
+					rotatedPiece[y, size - 1 - x] = FallingPiece[x, y];
+				}
+			}
+
+			if (!TestMoveCollidePiece(0, 0, rotatedPiece))
+				FallingPiece = rotatedPiece;
+		}
+
+		private void RotateRight()
+		{
+			int size = FallingPiece.GetLength(0);
+
+			bool[,] rotatedPiece = new bool[size, size];
+
+			for (int y = 0; y < size; y++)
+			{
+				for (int x = 0; x < size; x++)
+				{
+					rotatedPiece[size - 1 - y, x] = FallingPiece[x, y];
+				}
+			}
+
+			if (!TestMoveCollidePiece(0, 0, rotatedPiece))
+				FallingPiece = rotatedPiece;
 		}
 
 		private void NextPiece()
@@ -206,24 +251,26 @@ namespace YetAnotherTetrisClone
 						Playfield[FallingPiecePosition.X + x, FallingPiecePosition.Y - y] = (true, FallingPieceColor);
 					}
 
-
+			ClearCompleteLines();
 			NextPiece();
 		}
 
-		private bool TestMoveCollideFallingPiece(int dx, int dy)
+		private bool TestMoveCollidePiece(int dx, int dy, bool[,] piece = null)
 		{
+			piece ??= FallingPiece;
+
 			(int x, int y) position = (
 				FallingPiecePosition.X + dx,
 				FallingPiecePosition.Y + dy
 			);
 
-			int fallingWidth = FallingPiece.GetLength(1);
-			int fallingHeight = FallingPiece.GetLength(0);
+			int fallingWidth = piece.GetLength(1);
+			int fallingHeight = piece.GetLength(0);
 
 			// collide with blocks in the playing field
 			for (int y = 0; y < fallingHeight; y++)
 				for (int x = 0; x < fallingWidth; x++)
-					if (FallingPiece[x, y])
+					if (piece[x, y])
 					{
 						// collide block of piece with boundaries
 						if (position.x + x < 0 || position.x + x >= 10 ||
@@ -236,6 +283,34 @@ namespace YetAnotherTetrisClone
 					}
 
 			return false;
+		}
+
+		private void ClearCompleteLines()
+		{
+			for (int line = 0; line < 20; line++)
+			{
+				bool skip = false;
+
+				for (int x = 0; x < 10; x++)
+					if (!Playfield[x, line].occupied)
+					{
+						skip = true;
+						break;
+					}
+
+				if (!skip)
+				{
+					DropToClearedLine(line);
+					line--; // repeat line; TODO: check for x lines at once (needed for score counting)
+				}
+			}
+		}
+
+		private void DropToClearedLine(int line)
+		{
+			for (int y = line + 1; y < 24; y++)
+				for (int x = 0; x < 10; x++)
+					Playfield[x, y - 1] = Playfield[x, y];
 		}
 	}
 }
