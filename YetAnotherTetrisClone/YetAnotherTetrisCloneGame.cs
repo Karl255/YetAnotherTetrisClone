@@ -15,14 +15,13 @@ namespace YetAnotherTetrisClone
 		private int BlockSize;
 
 		private SpriteFont GameFont;
-		private MouseState PreviousMouseState;
 		private KeyboardState PreviousKeyboardState;
 
-		private Random Rng = new();
+		private Random Rng { get; init; } = new();
 		private GameState GameState = GameState.StartScreen;
-		private bool[,] Playfield = new bool[10, 24]; // visually capped to 20 height
+		private bool[,] Playfield;
 		private bool[,] FallingPiece = Tetrominos.O;
-		private Vector2 FallingPiecePosition = new(0, 0);
+		private (int X, int Y) FallingPiecePosition = new(0, 0);
 
 		private TimeSpan FallStepTime;
 		private TimeSpan LeftKeyFired;
@@ -55,7 +54,6 @@ namespace YetAnotherTetrisClone
 
 		protected override void Update(GameTime gameTime)
 		{
-			var mouseState = Mouse.GetState();
 			var keyboardState = Keyboard.GetState();
 			var totalGameTime = gameTime.TotalGameTime;
 
@@ -65,6 +63,7 @@ namespace YetAnotherTetrisClone
 					if (keyboardState.IsKeyDown(Keys.Enter))
 					{
 						FallStepTime = gameTime.TotalGameTime;
+						NewGame();
 						GameState = GameState.Playing;
 						NextPiece();
 					}
@@ -91,18 +90,22 @@ namespace YetAnotherTetrisClone
 					}
 
 					if (keyboardState.IsKeyDown(Keys.Down) // key
-						&& (totalGameTime - DownKeyFired).TotalMilliseconds >= 50 // delay
-						&& !TestMoveCollideFallingPiece(0, -1)) // colision
+						&& (totalGameTime - DownKeyFired).TotalMilliseconds >= 50) // delay
 					{
-						FallingPiecePosition.Y--;
-						DownKeyFired = totalGameTime;
-						FallStepTime = gameTime.TotalGameTime; // supress auto-falling
+						if (TestMoveCollideFallingPiece(0, -1)) // colision
+							PlaceAndNextPiece();
+						else
+						{
+							FallingPiecePosition.Y--;
+							DownKeyFired = totalGameTime;
+							FallStepTime = gameTime.TotalGameTime; // supress auto-falling
+						}
 					}
 
 					if ((totalGameTime - FallStepTime).TotalMilliseconds >= 500)
 					{
 						if (TestMoveCollideFallingPiece(0, -1))
-							NextPiece();
+							PlaceAndNextPiece();
 						else
 							FallingPiecePosition.Y--;
 
@@ -120,7 +123,6 @@ namespace YetAnotherTetrisClone
 					break;
 			}
 
-			PreviousMouseState = mouseState;
 			PreviousKeyboardState = keyboardState;
 
 			base.Update(gameTime);
@@ -139,6 +141,18 @@ namespace YetAnotherTetrisClone
 			}
 			else
 			{
+				for (int y = 0; y < 20; y++)
+					for (int x = 0; x < 10; x++)
+						if (Playfield[x, y])
+						{
+							SpriteBatch.Draw(
+								Block,
+								new Vector2(
+									x * BlockSize,
+									(19 - y) * BlockSize),
+								Color.Red);
+						}
+
 				int fallingWidth = FallingPiece.GetLength(1);
 				int fallingHeight = FallingPiece.GetLength(0);
 
@@ -164,6 +178,11 @@ namespace YetAnotherTetrisClone
 
 		// utility methods
 
+		private void NewGame()
+		{
+			Playfield = new bool[10, 24]; // visually capped to 20 height
+		}
+
 		private void NextPiece()
 		{
 			FallingPiece = Tetrominos.All[Rng.Next(Tetrominos.All.Length)];
@@ -173,11 +192,27 @@ namespace YetAnotherTetrisClone
 			FallingPiecePosition.Y = width < 4 ? 19 : 20; // for the I piece so it touches the ceiling
 		}
 
+		private void PlaceAndNextPiece()
+		{
+			int fallingWidth = FallingPiece.GetLength(1);
+			int fallingHeight = FallingPiece.GetLength(0);
+
+			for (int y = 0; y < fallingHeight; y++)
+				for (int x = 0; x < fallingWidth; x++)
+					if (FallingPiece[x, y])
+					{
+						Playfield[FallingPiecePosition.X + x, FallingPiecePosition.Y - y] = true;
+					}
+
+
+			NextPiece();
+		}
+
 		private bool TestMoveCollideFallingPiece(int dx, int dy)
 		{
 			(int x, int y) position = (
-				(int)(FallingPiecePosition.X + dx),
-				(int)(FallingPiecePosition.Y + dy)
+				FallingPiecePosition.X + dx,
+				FallingPiecePosition.Y + dy
 			);
 
 			int fallingWidth = FallingPiece.GetLength(1);
@@ -194,7 +229,7 @@ namespace YetAnotherTetrisClone
 							return true;
 
 						// collide block of piece with playfield
-						if (Playfield[position.x + x, position.y + y])
+						if (Playfield[position.x + x, position.y - y])
 							return true;
 					}
 
